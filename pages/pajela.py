@@ -110,6 +110,23 @@ def atualizar_status(id_relato, status):
         return False
 
 
+def atualizar_relato(id_relato, descricao, medida, status):
+    try:
+        supabase\
+            .table("relatos_dificuldades")\
+            .update({
+                "descricao": descricao,
+                "medida_tomada": medida,
+                "status": status
+            })\
+            .eq("id", id_relato)\
+            .execute()
+        return True
+    except Exception as e:
+        st.error(f"Erro ao atualizar relato: {e}")
+        return False
+
+
 
 # ==================================================
 # TELA
@@ -117,15 +134,17 @@ def atualizar_status(id_relato, status):
 
 def renderizar_relatos():
 
+    st.markdown("""
+    <style>
+    .relato-wrapper{max-width:1100px;margin-left:auto;margin-right:auto;padding:12px}
+    .relato-save .stButton>button{background:#0b5ed7;color:white;border-radius:6px;padding:8px 14px}
+    .relato-expander .stMarkdown{padding:6px}
+    </style>
+    <div class='relato-wrapper'>
+    """, unsafe_allow_html=True)
 
-    st.title(
-        "⚠️ Relatos de Dificuldades"
-    )
-
-
-    st.caption(
-        "Registre e acompanhe dificuldades dos alunos."
-    )
+    st.title("⚠️ Relatos de Dificuldades")
+    st.caption("Registre e acompanhe dificuldades dos alunos.")
 
 
     # ----------------------------
@@ -231,7 +250,7 @@ def renderizar_relatos():
                         "Relato salvo!"
                     )
 
-                    st.rerun()
+                    # sem rerun: continua a execução e a listagem abaixo será atualizada
 
 
 
@@ -260,101 +279,66 @@ def renderizar_relatos():
 
 
     else:
-
+        # buscar nomes dos alunos referenciados nos relatos
+        ids_alunos = list({r.get('id_aluno') for r in relatos if r.get('id_aluno')})
+        usuarios_map = {}
+        if ids_alunos:
+            ur = supabase.table('usuarios').select('id, nome').in_('id', ids_alunos).execute()
+            for u in (ur.data or []):
+                usuarios_map[u['id']] = u.get('nome')
 
         for r in relatos:
+            aluno_nome = usuarios_map.get(r.get('id_aluno'), f"ID {r.get('id_aluno')}")
+            data_fmt = ''
+            try:
+                data_fmt = datetime.strptime(r.get('data',''), '%Y-%m-%d').strftime('%d/%m/%Y')
+            except Exception:
+                data_fmt = r.get('data','')
 
+            titulo = f"{aluno_nome} — {data_fmt}"
+            with st.expander(titulo, expanded=False):
+                st.markdown("**Problema**")
+                st.error(r.get('descricao',''))
+                st.markdown("**Medida tomada**")
+                st.info(r.get('medida_tomada',''))
 
-            with st.container():
+                # botão editar / formulário
+                edit_key = f"edit_{r.get('id')}"
+                if edit_key not in st.session_state:
+                    st.session_state[edit_key] = False
 
+                col_a, col_b = st.columns([1,1])
+                with col_a:
+                    if st.button("✏️ Editar", key=f"btn_edit_{r.get('id')}"):
+                        st.session_state[edit_key] = True
+                with col_b:
+                    st.write("Status atual:")
+                    status_label = r.get('status') or 'ABERTO'
+                    icon = {'ABERTO':'🔴','EM ACOMPANHAMENTO':'🟡','FINALIZADO':'🟢'}.get(status_label,'🔴')
+                    st.markdown(f"{icon} **{status_label}**")
 
-                col1, col2 = st.columns(
-                    [5,1]
-                )
-
-
-                with col1:
-
-
-                    st.markdown(
-                    f"""
-### 👤 Aluno ID: {r['id_aluno']}
-
-📅 {datetime.strptime(
-r['data'],
-'%Y-%m-%d'
-).strftime('%d/%m/%Y')}
-
-"""
-                    )
-
-
-                    st.write(
-                        "### Problema"
-                    )
-
-                    st.error(
-                        r["descricao"]
-                    )
-
-
-                    st.write(
-                        "### Medida tomada"
-                    )
-
-
-                    st.info(
-                        r["medida_tomada"]
-                    )
-
-
-
-                with col2:
-
-
-                    novo_status = st.selectbox(
-
-                        "Status",
-
-                        [
-                            "ABERTO",
-                            "EM ACOMPANHAMENTO",
-                            "FINALIZADO"
-                        ],
-
-                        index=[
-                            "ABERTO",
-                            "EM ACOMPANHAMENTO",
-                            "FINALIZADO"
-                        ].index(
-                            r["status"]
-                        ),
-
-                        key=f"status_{r['id']}",
-
-                        format_func=lambda x:
-                        {
-                            "ABERTO": "🔴",
-                            "EM ACOMPANHAMENTO": "🟡",
-                            "FINALIZADO": "🟢"
-                        }[x]
-
-                    )
-
-
-                    if novo_status != r["status"]:
-
-
-                        atualizar_status(
-                            r["id"],
-                            novo_status
-                        )
-
-
-                        st.rerun()
-
+                if st.session_state[edit_key]:
+                    new_desc = st.text_area("Descrição", value=r.get('descricao',''), key=f"desc_{r.get('id')}")
+                    new_medida = st.text_area("Medida tomada", value=r.get('medida_tomada',''), key=f"med_{r.get('id')}")
+                    new_status = st.selectbox("Status", ["ABERTO","EM ACOMPANHAMENTO","FINALIZADO"], index=["ABERTO","EM ACOMPANHAMENTO","FINALIZADO"].index(r.get('status','ABERTO')), key=f"status_edit_{r.get('id')}")
+                    btn_col1, btn_col2 = st.columns([1,1])
+                    with btn_col1:
+                        if st.button("💾 Salvar alterações", key=f"save_relato_{r.get('id')}"):
+                            ok = atualizar_relato(r.get('id'), new_desc, new_medida, new_status)
+                            if ok:
+                                        st.success("Relato atualizado.")
+                                        # atualizar objeto local para refletir mudanças sem reiniciar
+                                        r['descricao'] = new_desc
+                                        r['medida_tomada'] = new_medida
+                                        r['status'] = new_status
+                                        st.session_state[edit_key] = False
+                    with btn_col2:
+                        if st.button("Cancelar", key=f"cancel_relato_{r.get('id')}"):
+                            st.session_state[edit_key] = False
 
                 st.divider()
+    # fechar wrapper
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 

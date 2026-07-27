@@ -33,6 +33,13 @@ from database.turmas import (
     desvincular_auxiliar,
 )
 
+from database.conteudos import (
+    listar_conteudos,
+    inserir_conteudo,
+    editar_conteudo,
+    excluir_conteudo,
+)
+
 
 def _get_perfis_disponiveis(perfil_logado: str):
     if perfil_logado in ["ADMIN", "TI"]:
@@ -314,11 +321,12 @@ perfil_logado = usuario.get("perfil", "—")
 
 st.title("📋 Cadastros")
 
-aba1,aba2,aba3,aba4 = st.tabs([
+aba1,aba2,aba3,aba4,aba5 = st.tabs([
 "👥 Usuários",
 "🌏 Região",
 "📍Localidade",
 "👨🏻‍🎓👨🏽‍🎓👨🏿‍🎓TURMA",
+"📚 Conteúdos",
 ])
 
 
@@ -1589,3 +1597,166 @@ with aba4:
 
     else:
         st.info("Nenhuma turma cadastrada.")
+
+with aba5:
+
+    st.title("📚 Conteúdos")
+
+    col1, col2 = st.columns([1, 5])
+
+    with col1:
+        if st.button("➕ Novo conteúdo"):
+            st.session_state.novo_conteudo = True
+
+    st.divider()
+
+    if st.session_state.get("novo_conteudo", False):
+
+        with st.form("form_novo_conteudo"):
+
+            categoria = st.text_input("Categoria*", key="novo_conteudo_categoria")
+            titulo = st.text_input("Título*", key="novo_conteudo_titulo")
+            licao_inicial = st.number_input("Lição Inicial*", min_value=0, step=1, key="novo_conteudo_licao_inicial")
+            licao_final = st.number_input("Lição Final*", min_value=0, step=1, key="novo_conteudo_licao_final")
+            descricao = st.text_area("Descrição (opcional)", key="novo_conteudo_descricao", height=100)
+
+            form_invalido = (
+                not categoria.strip()
+                or not titulo.strip()
+                or licao_inicial < 0
+                or licao_final < 0
+            )
+
+            col_salvar, col_cancelar = st.columns(2)
+
+            with col_salvar:
+                salvar = st.form_submit_button("Salvar")
+
+            with col_cancelar:
+                cancelar = st.form_submit_button("Cancelar")
+
+            if salvar:
+                if form_invalido:
+                    st.error("Preencha todos os campos obrigatórios (categoria, título, lição inicial e lição final).")
+                elif licao_inicial > licao_final:
+                    st.error("A lição inicial não pode ser maior que a lição final.")
+                else:
+                    try:
+                        inserir_conteudo(
+                            categoria.strip(),
+                            titulo.strip(),
+                            int(licao_inicial),
+                            int(licao_final),
+                            descricao if descricao.strip() else None
+                        )
+                        st.success("Conteúdo criado com sucesso!")
+                        st.session_state.novo_conteudo = False
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao criar conteúdo: {e}")
+
+            if cancelar:
+                st.session_state.novo_conteudo = False
+                st.rerun()
+
+    conteudos = listar_conteudos()
+
+    if conteudos:
+        st.markdown("### Conteúdos Cadastrados")
+        
+        df = pd.DataFrame(conteudos)
+        st.dataframe(
+            df,
+            use_container_width=True,
+            hide_index=True,
+            height=400,
+        )
+
+        st.markdown("---")
+        st.markdown("### Editar/Excluir Conteúdo")
+
+        def format_conteudo(conteudo_item):
+            return f"{conteudo_item['Categoria']} - {conteudo_item['Título']}"
+
+        conteudo_selecionado = st.selectbox(
+            "Selecionar conteúdo para editar/excluir",
+            conteudos,
+            format_func=format_conteudo,
+            key="conteudo_select"
+        )
+
+        if conteudo_selecionado:
+            with st.form("form_edit_conteudo"):
+                categoria_edit = st.text_input(
+                    "Categoria*",
+                    value=conteudo_selecionado["Categoria"],
+                    key=f"conteudo_edit_categoria_{conteudo_selecionado['id']}"
+                )
+                titulo_edit = st.text_input(
+                    "Título*",
+                    value=conteudo_selecionado["Título"],
+                    key=f"conteudo_edit_titulo_{conteudo_selecionado['id']}"
+                )
+                licao_inicial_edit = st.number_input(
+                    "Lição Inicial*",
+                    value=int(conteudo_selecionado["Lição Inicial"]) if conteudo_selecionado["Lição Inicial"] else 0,
+                    min_value=0,
+                    step=1,
+                    key=f"conteudo_edit_licao_inicial_{conteudo_selecionado['id']}"
+                )
+                licao_final_edit = st.number_input(
+                    "Lição Final*",
+                    value=int(conteudo_selecionado["Lição Final"]) if conteudo_selecionado["Lição Final"] else 0,
+                    min_value=0,
+                    step=1,
+                    key=f"conteudo_edit_licao_final_{conteudo_selecionado['id']}"
+                )
+                descricao_edit = st.text_area(
+                    "Descrição (opcional)",
+                    value=conteudo_selecionado["Descrição"] if conteudo_selecionado["Descrição"] else "",
+                    key=f"conteudo_edit_descricao_{conteudo_selecionado['id']}",
+                    height=100
+                )
+                ativo_edit = st.checkbox(
+                    "Ativo",
+                    value=conteudo_selecionado["Ativo"],
+                    key=f"conteudo_edit_ativo_{conteudo_selecionado['id']}"
+                )
+
+                col_update, col_delete = st.columns(2)
+                with col_update:
+                    salvar_edit = st.form_submit_button("Salvar alterações")
+                with col_delete:
+                    excluir = st.form_submit_button("Excluir")
+
+                if salvar_edit:
+                    if not categoria_edit.strip() or not titulo_edit.strip():
+                        st.error("Preencha categoria e título.")
+                    elif licao_inicial_edit > licao_final_edit:
+                        st.error("A lição inicial não pode ser maior que a lição final.")
+                    else:
+                        try:
+                            editar_conteudo(
+                                conteudo_selecionado["id"],
+                                categoria_edit.strip(),
+                                titulo_edit.strip(),
+                                int(licao_inicial_edit),
+                                int(licao_final_edit),
+                                descricao_edit if descricao_edit.strip() else None,
+                                ativo_edit
+                            )
+                            st.success("Conteúdo atualizado com sucesso!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao atualizar conteúdo: {e}")
+
+                if excluir:
+                    try:
+                        excluir_conteudo(conteudo_selecionado["id"])
+                        st.success("Conteúdo excluído com sucesso!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao excluir conteúdo: {e}")
+
+    else:
+        st.info("Nenhum conteúdo cadastrado.")
