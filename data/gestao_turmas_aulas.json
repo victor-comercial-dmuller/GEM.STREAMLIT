@@ -1,0 +1,15 @@
+{
+  "turmas": [
+    {
+      "id": "c2447be6",
+      "nome": "FLEUTA TRANSVERSAL",
+      "professor": "VICTOR.NUNES",
+      "periodo": "MATUTUINO",
+      "turno": "Manhã",
+      "capacidade": 5,
+      "status": "Ativa",
+      "criado_em": "18/07/2026 14:53"
+    }
+  ],
+  "aulas": []
+}

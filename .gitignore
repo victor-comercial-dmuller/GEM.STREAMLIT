@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.swp
+*.swo
+.env
+.env.*
+.envrc
+.env.local
+.env.development
+.env.production
+.streamlit/
+.vscode/

@@ -1,0 +1,182 @@
+# HIERARQUIA E REGRAS DE ISOLAMENTO DE DADOS
+# ESTE DOCUMENTO É A FONTE OFICIAL DAS REGRAS DE NEGÓCIO.
+# TODA IMPLEMENTAÇÃO NOVA OU ALTERAÇÃO DEVE OBRIGATORIAMENTE RESPEITAR ESTE ARQUIVO.
+
+==================================================================
+HIERARQUIA DOS PERFIS
+==================================================================
+
+A hierarquia dos usuários é fixa e deve ser respeitada em toda a aplicação.
+
+1. ADMIN
+2. COORDENADOR REGIONAL
+3. COORDENADOR LOCAL
+4. PROFESSOR
+5. AUXILIAR
+6. ALUNO
+
+Todos os usuários estão armazenados na tabela "usuarios".
+
+O perfil do usuário é definido EXCLUSIVAMENTE pela coluna:
+
+usuarios.perfil
+
+Nenhuma outra informação deve ser utilizada para identificar o perfil.
+
+==================================================================
+HIERARQUIA DA ESTRUTURA DO NEGÓCIO
+==================================================================
+
+A estrutura da organização segue obrigatoriamente a seguinte ordem:
+
+REGIÃO
+    ↓
+LOCALIDADE
+    ↓
+TURMA
+    ↓
+AULAS
+PRESENÇAS
+AVALIAÇÕES
+CONTEÚDOS
+ALUNOS
+PROFESSOR
+AUXILIAR
+
+Toda informação cadastrada pertence obrigatoriamente a algum ponto dessa estrutura.
+
+==================================================================
+REGRA GERAL DE ISOLAMENTO
+==================================================================
+
+Todo usuário deve visualizar APENAS os dados permitidos pelo seu perfil.
+
+O isolamento deve ser aplicado:
+
+- em consultas
+- em listagens
+- em filtros
+- em dashboards
+- em relatórios
+- em indicadores
+- em telas de cadastro
+- em telas de edição
+- em qualquer nova funcionalidade criada.
+
+Nunca confiar apenas em filtros visuais.
+
+As consultas devem nascer já filtradas.
+
+==================================================================
+REGRAS POR PERFIL
+==================================================================
+
+ADMIN
+
+- Possui acesso total.
+- Nunca sofre isolamento.
+- Pode visualizar, cadastrar, editar e excluir qualquer informação.
+
+------------------------------------------------------------
+
+COORDENADOR REGIONAL
+
+Visualiza apenas registros pertencentes à mesma região do usuário.
+
+Filtro obrigatório:
+
+regiao_id == usuarios.regiao_id
+
+Tudo deve ser limitado por essa região.
+
+------------------------------------------------------------
+
+COORDENADOR LOCAL
+
+Visualiza apenas registros pertencentes à mesma localidade do usuário.
+
+Filtro obrigatório:
+
+localidade_id == usuarios.localidade_id
+
+Tudo deve ser limitado por essa localidade.
+
+------------------------------------------------------------
+
+PROFESSOR
+
+Visualiza apenas informações das turmas em que é o professor responsável.
+
+O vínculo é feito por:
+
+turmas.professor_id == usuarios.id
+
+A partir dessas turmas, pode visualizar somente informações relacionadas a elas:
+
+- alunos
+- aulas
+- presenças
+- avaliações
+- conteúdos
+- planejamentos
+- demais informações vinculadas à turma.
+
+Caso o professor esteja vinculado a várias turmas, deve visualizar todas elas.
+
+------------------------------------------------------------
+
+AUXILIAR
+
+Segue exatamente as mesmas regras do Professor.
+
+O vínculo é:
+
+turmas.auxiliar_id == usuarios.id
+
+Pode visualizar exclusivamente as turmas em que é auxiliar.
+
+Caso esteja vinculado a várias turmas, deve visualizar todas elas.
+
+------------------------------------------------------------
+
+ALUNO
+
+Visualiza exclusivamente informações referentes a si próprio.
+
+Toda consulta deve ser limitada pelo:
+
+id_aluno
+
+O aluno nunca pode visualizar dados de outro aluno.
+
+==================================================================
+REGRAS IMPORTANTES
+==================================================================
+
+As permissões são cumulativas apenas pela hierarquia.
+
+Um usuário nunca pode visualizar informações acima do seu nível.
+
+Exemplos:
+
+Professor não pode visualizar outras turmas.
+
+Auxiliar não pode visualizar turmas onde não atua.
+
+Coordenador Local não pode visualizar localidades diferentes.
+
+Coordenador Regional não pode visualizar outra região.
+
+Aluno nunca pode visualizar outro aluno.
+
+==================================================================
+REGRA PARA DESENVOLVIMENTO
+==================================================================
+
+Toda nova tela, consulta, relatório, gráfico, dashboard ou funcionalidade criada deverá implementar automaticamente o isolamento descrito neste documento.
+
+É proibido criar qualquer funcionalidade que ignore estas regras.
+
+Na dúvida, o comportamento deve sempre ser o mais restritivo possível.
+
+Este arquivo é a fonte oficial das regras de negócio referentes à hierarquia e isolamento de dados da aplicação.
