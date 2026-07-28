@@ -75,6 +75,7 @@ else:
         st.Page("pages/planejamento.py", title="Planejamento", icon="📍"),
         st.Page("pages/aulas.py", title="Aulas", icon="📚"),
         st.Page("pages/metronomo.py", title="Metrônomo", icon="🎚️"),
+        st.Page("pages/afinador.py", title="Afinador", icon="🔊"),
         st.Page("pages/pajela.py", title="Pajela", icon="📝"),
         st.Page("pages/p_minimo.py", title="Programa mínimo", icon="📖"),
         st.Page("pages/avaliacoes.py", title="Avaliações", icon="✅"),

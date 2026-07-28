@@ -1,6 +1,10 @@
 ﻿
 supabase==2.31.0
-
+streamlit
+pandas
+numpy
+plotly
+python-dotenv
 
 
 
