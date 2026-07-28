@@ -143,7 +143,7 @@ def carregar_presencas():
 
     resposta = (
         supabase
-        .table("alunos_aula")
+        .table("presencas")
         .select("*")
         .execute()
     )
@@ -297,21 +297,54 @@ if not aulas.empty:
 
 
 presencas_filtradas = presencas.copy()
-if not presencas_filtradas.empty:
-    if "id_aula" in presencas_filtradas.columns and not aulas.empty and "id" in aulas.columns:
-        aula_info = aulas[["id", "id_turma", "data_aula"]].copy()
-        aula_info = aula_info.rename(columns={"id": "id_aula", "data_aula": "aula_data"})
-        presencas_filtradas = presencas_filtradas.merge(aula_info, on="id_aula", how="left")
+if "id_aula" in presencas_filtradas.columns and not aulas.empty:
+
+    aula_info = aulas[
+        ["id", "id_turma", "data_aula"]
+    ].copy()
+
+    aula_info = aula_info.rename(
+        columns={
+            "id": "id_aula",
+            "data_aula": "aula_data"
+        }
+    )
+
+    presencas_filtradas = presencas_filtradas.merge(
+        aula_info,
+        on="id_aula",
+        how="left"
+    )
     if alunos_ids_disponiveis and "id_aluno" in presencas_filtradas.columns:
-        presencas_filtradas = presencas_filtradas[presencas_filtradas["id_aluno"].isin(alunos_ids_disponiveis)]
-    presencas_filtradas = _filtrar_por_turma(presencas_filtradas, filtro_turma)
+        presencas_filtradas = presencas_filtradas[
+            presencas_filtradas["id_aluno"].isin(alunos_ids_disponiveis)
+        ]
+
+    if filtro_turma is not None and "id_turma" in presencas_filtradas.columns:
+        presencas_filtradas = presencas_filtradas[
+            presencas_filtradas["id_turma"] == filtro_turma
+        ]
     if "created_at" in presencas_filtradas.columns:
         presencas_filtradas = _filtrar_por_data(presencas_filtradas, "created_at", data_inicial, data_final)
     elif "aula_data" in presencas_filtradas.columns:
         presencas_filtradas = _filtrar_por_data(presencas_filtradas, "aula_data", data_inicial, data_final)
 
 
-evaliacoes_filtradas = avaliacoes.copy()
+avaliacoes_filtradas = avaliacoes.copy()
+# Converter nota para número
+if "nota" in avaliacoes_filtradas.columns:
+
+    avaliacoes_filtradas["nota"] = (
+        avaliacoes_filtradas["nota"]
+        .astype(str)
+        .str.replace(",", ".", regex=False)
+    )
+
+    avaliacoes_filtradas["nota"] = pd.to_numeric(
+        avaliacoes_filtradas["nota"],
+        errors="coerce"
+    )
+
 if not avaliacoes_filtradas.empty:
     if alunos_ids_disponiveis and "id_aluno" in avaliacoes_filtradas.columns:
         avaliacoes_filtradas = avaliacoes_filtradas[avaliacoes_filtradas["id_aluno"].isin(alunos_ids_disponiveis)]
@@ -322,7 +355,7 @@ if not avaliacoes_filtradas.empty:
         avaliacoes_filtradas = _filtrar_por_data(avaliacoes_filtradas, "data_avaliacao", data_inicial, data_final)
 
 
-total_alunos = len(alunos_filtrados)
+total_alunos = len(alunos_filtrados["id"].unique())
 
 total_aulas = len(aulas_filtradas)
 
@@ -335,7 +368,7 @@ if not presencas_filtradas.empty:
 
 if presenca_col is not None and not presencas_filtradas.empty:
     presentes = _presentes(presencas_filtradas, presenca_col).sum()
-    taxa_presenca = round(presentes / len(presencas_filtradas) * 100) if len(presencas_filtradas) else 0
+    taxa_presenca = round(presentes / len(presencas_filtradas)) if len(presencas_filtradas) else 0
 else:
     taxa_presenca = 0
 
@@ -452,22 +485,23 @@ with col_esq:
     )
 
 
-
+    
     if not presencas_filtradas.empty:
 
-
-        if "presenca" in presencas_filtradas.columns:
-            presente_bool = _presentes(presencas_filtradas, "presenca")
-        elif "presente" in presencas_filtradas.columns:
-            presente_bool = _presentes(presencas_filtradas, "presente")
-        else:
-            presente_bool = pd.Series([], dtype="int")
+        presencas_filtradas["presente_bool"] = (
+            presencas_filtradas["presenca"]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            .isin(["true", "1", "presente", "sim", "s"])
+        )
 
         ranking = (
             presencas_filtradas
-            .assign(presente_bool=presente_bool)
             .groupby("id_aluno")
-            .agg(presencas=("presente_bool", "sum"))
+            .agg(
+                presencas=("presente_bool", "sum")
+            )
             .reset_index()
             .sort_values(
                 "presencas",
@@ -475,23 +509,18 @@ with col_esq:
             )
         )
 
-
         if not alunos_filtrados.empty:
 
             ranking = ranking.merge(
                 alunos_filtrados[
                     ["id","nome"]
-                ],
-                left_on="id_aluno",
-                right_on="id",
+                ].rename(columns={"id":"id_aluno"}),
+                on="id_aluno",
                 how="left"
             )
 
-
         st.dataframe(
-            ranking[
-                ["nome","presencas"]
-            ],
+            ranking[["nome","presencas"]],
             use_container_width=True,
             hide_index=True
         )
@@ -519,7 +548,7 @@ with col_esq:
                 notas
                 .groupby("id_aluno")
                 .agg(total_nota=("nota", "sum"), total_max=("nota_maxima", "sum"))
-                .assign(media=lambda df: (df["total_nota"] / df["total_max"] * 100))
+                .assign(media=lambda df: (df["total_nota"] / df["total_max"]))
                 .reset_index()
                 .sort_values(
                     "media",
