@@ -80,6 +80,7 @@ else:
         st.Page("pages/p_minimo.py", title="Programa mínimo", icon="📖"),
         st.Page("pages/avaliacoes.py", title="Avaliações", icon="✅"),
         st.Page("pages/dashboard.py", title="Dashboard", icon="📊"),
+        st.Page("pages/ferramentas.py", title="Ferramentas", icon="🛠️"),
     ])
 
     with st.sidebar:
