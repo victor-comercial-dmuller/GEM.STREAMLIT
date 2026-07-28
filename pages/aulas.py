@@ -201,11 +201,26 @@ def registrar_presenca(dados_presenca):
             resposta = supabase.table("alunos_aula").insert(dados_presenca).execute()
         # checar erros simples
         if getattr(resposta, 'error', None):
+            st.error(f"Erro ao inserir lições: {resposta.error}")
+            return False
+        return True
+    except Exception as e:
+        st.error(f"Erro ao registrar lições: {e}")
+        return False
+
+
+def registrar_presencas(dados_presencas):
+    try:
+        if isinstance(dados_presencas, list):
+            resposta = supabase.table("presencas").insert(dados_presencas).execute()
+        else:
+            resposta = supabase.table("presencas").insert(dados_presencas).execute()
+        if getattr(resposta, 'error', None):
             st.error(f"Erro ao inserir presenças: {resposta.error}")
             return False
         return True
     except Exception as e:
-        st.error(f"Erro ao registrar presença: {e}")
+        st.error(f"Erro ao registrar presenças: {e}")
         return False
 
 
@@ -355,7 +370,10 @@ status_opcoes = ["PENDENTE", "EM ANDAMENTO", "CONCLUÍDO"]
 default_presenca = {
     "presente": False,
     "status": "PENDENTE",
-    "especificacao": ""
+    "especificacao": "",
+    "justificativa": "",
+    "tipo": "Usar geral",
+    "id_conteudo": None
 }
 
 if "licoes_status" not in st.session_state:
@@ -414,9 +432,14 @@ with st.expander("Global", expanded=True):
                         st.session_state.global_licoes_status[str(idx)] = next_status
                         for nome_aluno in lista_alunos.keys():
                             if st.session_state.presenca.get(nome_aluno, default_presenca)["presente"]:
-                                st.session_state.licoes_status.setdefault(nome_aluno, {"_conteudo_id": id_conteudo})
-                                st.session_state.licoes_status[nome_aluno]["_conteudo_id"] = id_conteudo
-                                st.session_state.licoes_status[nome_aluno][str(idx)] = next_status
+                                aluno_tipo = st.session_state.presenca[nome_aluno].get("tipo", "Usar geral")
+                                aluno_id_conteudo = st.session_state.presenca[nome_aluno].get("id_conteudo")
+                                if not aluno_id_conteudo or aluno_tipo == "Usar geral":
+                                    aluno_id_conteudo = id_conteudo
+                                if aluno_id_conteudo:
+                                    st.session_state.licoes_status.setdefault(nome_aluno, {"_conteudo_id": aluno_id_conteudo})
+                                    st.session_state.licoes_status[nome_aluno]["_conteudo_id"] = aluno_id_conteudo
+                                    st.session_state.licoes_status[nome_aluno][str(idx)] = next_status
 
     st.write("**Status global atual:**")
     status_labels = [f"{k}: {v}" for k, v in st.session_state.global_licoes_status.items() if k != "_conteudo_id"]
@@ -434,18 +457,13 @@ for nome_aluno, id_aluno in lista_alunos.items():
         st.session_state.presenca[nome_aluno] = {
             "presente": False,
             "status": "PENDENTE",
-            "especificacao": ""
+            "especificacao": "",
+            "justificativa": "",
+            "tipo": "Usar geral",
+            "id_conteudo": None
         }
 
     st.session_state.licoes_status.setdefault(nome_aluno, {})
-
-    if conteudo_selecionado:
-        inicio = int(conteudo_selecionado.get("licao_inicial", 1) or 1)
-        fim = int(conteudo_selecionado.get("licao_final", inicio) or inicio)
-        if st.session_state.licoes_status[nome_aluno].get("_conteudo_id") != id_conteudo:
-            st.session_state.licoes_status[nome_aluno] = {"_conteudo_id": id_conteudo}
-        for n in range(inicio, fim + 1):
-            st.session_state.licoes_status[nome_aluno].setdefault(str(n), "PENDENTE")
 
     with st.expander(nome_aluno, expanded=False):
         st.write("### ", nome_aluno)
@@ -458,15 +476,67 @@ for nome_aluno, id_aluno in lista_alunos.items():
 
         st.write("**Presença:**", "Sim" if st.session_state.presenca[nome_aluno]["presente"] else "Não")
 
-        with st.expander("Lições", expanded=False):
-            if not conteudo_selecionado:
-                st.info("Selecione um conteúdo para ver as lições.")
+        tipo_opcoes_aluno = ["Usar geral"] + categorias if categorias else ["Usar geral"]
+        tipo_aluno = st.selectbox(
+            "Tipo do aluno",
+            tipo_opcoes_aluno,
+            index=tipo_opcoes_aluno.index(st.session_state.presenca[nome_aluno].get("tipo", "Usar geral")) if st.session_state.presenca[nome_aluno].get("tipo", "Usar geral") in tipo_opcoes_aluno else 0,
+            key=f"tipo_aluno_{id_aluno}"
+        )
+        st.session_state.presenca[nome_aluno]["tipo"] = tipo_aluno
+
+        aluno_conteudo_id = st.session_state.presenca[nome_aluno].get("id_conteudo")
+        conteudo_selecionado_aluno = None
+        if tipo_aluno != "Usar geral":
+            conteudos_filtrados_aluno = sorted([c for c in conteudos if c.get("categoria") == tipo_aluno], key=lambda x: x.get("titulo", ""))
+            lista_conteudos_aluno = {f"{c['titulo']}": c["id"] for c in conteudos_filtrados_aluno if c.get("titulo")}
+            if lista_conteudos_aluno:
+                conteudo_nomes = list(lista_conteudos_aluno.keys())
+                selected_index = 0
+                if aluno_conteudo_id and any(v == aluno_conteudo_id for v in lista_conteudos_aluno.values()):
+                    selected_name = next((k for k, v in lista_conteudos_aluno.items() if v == aluno_conteudo_id), None)
+                    if selected_name and selected_name in conteudo_nomes:
+                        selected_index = conteudo_nomes.index(selected_name)
+                conteudo_nome_aluno = st.selectbox(
+                    "Conteúdo do aluno",
+                    conteudo_nomes,
+                    index=selected_index,
+                    key=f"conteudo_aluno_{id_aluno}"
+                )
+                aluno_conteudo_id = lista_conteudos_aluno[conteudo_nome_aluno]
+                conteudo_selecionado_aluno = next((c for c in conteudos_filtrados_aluno if c.get("id") == aluno_conteudo_id), None)
             else:
-                inicio = int(conteudo_selecionado.get("licao_inicial", 1) or 1)
-                fim = int(conteudo_selecionado.get("licao_final", inicio) or inicio)
+                st.info("Nenhum conteúdo ativo para o tipo selecionado deste aluno.")
+                aluno_conteudo_id = None
+        else:
+            aluno_conteudo_id = id_conteudo
+            conteudo_selecionado_aluno = conteudo_selecionado
+            st.info("Usando tipo e conteúdo gerais da aula.")
+
+        st.session_state.presenca[nome_aluno]["id_conteudo"] = aluno_conteudo_id
+
+        justificativa = st.text_area(
+            "Justificativa",
+            value=st.session_state.presenca[nome_aluno].get("justificativa", ""),
+            key=f"justificativa_{id_aluno}",
+            height=80
+        )
+        st.session_state.presenca[nome_aluno]["justificativa"] = justificativa
+
+        with st.expander("Lições", expanded=False):
+            if not conteudo_selecionado_aluno:
+                st.info("Selecione um conteúdo válido para ver as lições deste aluno.")
+            else:
+                inicio = int(conteudo_selecionado_aluno.get("licao_inicial", 1) or 1)
+                fim = int(conteudo_selecionado_aluno.get("licao_final", inicio) or inicio)
                 total = fim - inicio + 1
                 per_row = 8
                 rows = (total + per_row - 1) // per_row
+
+                if st.session_state.licoes_status[nome_aluno].get("_conteudo_id") != aluno_conteudo_id:
+                    st.session_state.licoes_status[nome_aluno] = {"_conteudo_id": aluno_conteudo_id}
+                    for n in range(inicio, fim + 1):
+                        st.session_state.licoes_status[nome_aluno].setdefault(str(n), "PENDENTE")
 
                 for r in range(rows):
                     cols = st.columns(per_row)
@@ -509,14 +579,33 @@ with cols_center[1]:
             if not id_aula:
                 st.error("Falha ao criar a aula.")
             else:
+                registros_presencas = []
                 registros_aulas = []
                 for nome_aluno, id_aluno in lista_alunos.items():
                     presente = st.session_state.presenca.get(nome_aluno, {}).get("presente", False)
-                    if not presente or not conteudo_selecionado:
+                    justificativa = st.session_state.presenca.get(nome_aluno, {}).get("justificativa", "") or ""
+                    registros_presencas.append({
+                        "id_aula": id_aula,
+                        "id_aluno": id_aluno,
+                        "presenca": presente,
+                        "justificativa": justificativa.strip()
+                    })
+
+                    aluno_tipo_selecionado = st.session_state.presenca[nome_aluno].get("tipo", "Usar geral")
+                    aluno_conteudo_id = st.session_state.presenca[nome_aluno].get("id_conteudo")
+                    if aluno_tipo_selecionado == "Usar geral":
+                        aluno_tipo_selecionado = tipo
+                        aluno_conteudo_id = id_conteudo
+
+                    if not presente or not aluno_conteudo_id:
                         continue
 
-                    inicio = int(conteudo_selecionado.get("licao_inicial", 1) or 1)
-                    fim = int(conteudo_selecionado.get("licao_final", inicio) or inicio)
+                    conteudo_selecionado_aluno = next((c for c in conteudos if c.get("id") == aluno_conteudo_id), None)
+                    if not conteudo_selecionado_aluno:
+                        continue
+
+                    inicio = int(conteudo_selecionado_aluno.get("licao_inicial", 1) or 1)
+                    fim = int(conteudo_selecionado_aluno.get("licao_final", inicio) or inicio)
                     licoes_por_aluno = st.session_state.licoes_status.get(nome_aluno, {})
 
                     for li in range(inicio, fim + 1):
@@ -530,23 +619,33 @@ with cols_center[1]:
                             registros_aulas.append({
                                 "id_aula": id_aula,
                                 "id_aluno": id_aluno,
-                                "presenca": True,
+                                "tipo": aluno_tipo_selecionado,
+                                "conteudo": conteudo_selecionado_aluno.get("titulo", ""),
                                 "status_conteudo": status_li,
                                 "licao": str(li)
                             })
 
+                sucesso_presencas = registrar_presencas(registros_presencas)
+                sucesso_licoes = True
                 if registros_aulas:
-                    sucesso = registrar_presenca(registros_aulas)
-                    if sucesso:
-                        st.success("Aula e lições salvas com sucesso!")
-                        st.session_state.presenca = {}
-                        st.session_state.licoes_status = {}
-                        st.session_state.global_licoes_status = {"_conteudo_id": None}
-                        st.session_state.global_presenca = False
-                    else:
-                        st.error("Falha ao salvar as lições. Consulte os logs.")
+                    sucesso_licoes = registrar_presenca(registros_aulas)
+
+                if sucesso_presencas and sucesso_licoes:
+                    st.success("Aula, presenças e lições salvas com sucesso!")
+                    st.session_state.presenca = {}
+                    st.session_state.licoes_status = {}
+                    st.session_state.global_licoes_status = {"_conteudo_id": None}
+                    st.session_state.global_presenca = False
+                elif sucesso_presencas and not registros_aulas:
+                    st.success("Aula e presenças salvas com sucesso! Nenhuma lição diferente de PENDENTE foi marcada.")
+                    st.session_state.presenca = {}
+                    st.session_state.licoes_status = {}
+                    st.session_state.global_licoes_status = {"_conteudo_id": None}
+                    st.session_state.global_presenca = False
+                elif not sucesso_presencas:
+                    st.error("Falha ao salvar as presenças. Consulte os logs.")
                 else:
-                    st.warning("Nenhuma lição diferente de PENDENTE foi marcada para alunos presentes.")
+                    st.error("Falha ao salvar as lições. Consulte os logs.")
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ================================
@@ -578,8 +677,8 @@ else:
             with st.expander("Ver alunos", expanded=False):
                 resp = (
                     supabase
-                    .table('alunos_aula')
-                    .select('id, id_aluno, presenca, licao, status_conteudo')
+                    .table('presencas')
+                    .select('id, id_aluno, presenca, justificativa')
                     .eq('id_aula', aula.get('id'))
                     .execute()
                 )
@@ -590,19 +689,21 @@ else:
                     ids = [r.get('id_aluno') for r in registros]
                     usuarios_resp = supabase.table('usuarios').select('id, nome').in_('id', ids).execute()
                     usuarios_map = {u['id']: u.get('nome','') for u in (usuarios_resp.data or [])}
-                    rows = []
                     for r in registros:
                         nome = usuarios_map.get(r.get('id_aluno'), str(r.get('id_aluno')))
                         presente = r.get('presenca', False)
+                        justificativa = r.get('justificativa', '')
                         badge = "<span class='badge-presenca presente'>Presente</span>" if presente else "<span class='badge-presenca ausente'>Ausente</span>"
                         st.markdown(f"**{nome}** — {badge}", unsafe_allow_html=True)
+                        if justificativa:
+                            st.markdown(f"**Justificativa:** {justificativa}")
 
             # Lições
             with st.expander("Lições", expanded=False):
                 resp2 = (
                     supabase
                     .table('alunos_aula')
-                    .select('id, id_aluno, presenca, licao, status_conteudo')
+                    .select('id, id_aluno, tipo, conteudo, licao, status_conteudo')
                     .eq('id_aula', aula.get('id'))
                     .order('id_aluno')
                     .execute()
@@ -614,14 +715,12 @@ else:
                     ids2 = [r.get('id_aluno') for r in reg2]
                     usuarios_resp2 = supabase.table('usuarios').select('id, nome').in_('id', ids2).execute()
                     usuarios_map2 = {u['id']: u.get('nome','') for u in (usuarios_resp2.data or [])}
-                    conteudo_titulo = None
-                    if aula.get('id_conteudo'):
-                        conteudo_titulo = next((c.get('titulo') for c in conteudos if c.get('id') == aula.get('id_conteudo')), None)
                     tabela = []
                     for r in reg2:
                         tabela.append({
                             'Aluno': usuarios_map2.get(r.get('id_aluno'), r.get('id_aluno')),
-                            'Conteúdo': conteudo_titulo or '',
+                            'Tipo': r.get('tipo') or aula.get('tipo', ''),
+                            'Conteúdo': r.get('conteudo') or '',
                             'Lição': r.get('licao'),
                             'Status': r.get('status_conteudo')
                         })

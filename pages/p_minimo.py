@@ -53,7 +53,6 @@ def carregar_categorias():
         .table("conteudos")
         .select("*")
         .order("categoria")
-        .order("fase")
         .order("titulo")
         .execute()
     )
@@ -122,6 +121,8 @@ if novo:
     limpar_form()
 
     st.session_state.editar = None
+    # manter formulário aberto entre reruns
+    st.session_state.show_novo_programa = True
 
 
 
@@ -135,7 +136,7 @@ if "editar" not in st.session_state:
 
 
 
-if novo or st.session_state.editar:
+if st.session_state.get('show_novo_programa') or st.session_state.editar:
 
 
     st.divider()
@@ -245,35 +246,36 @@ if novo or st.session_state.editar:
         if categorias_disponiveis:
             cat_row = categorias[categorias["categoria"].fillna("").astype(str) + " - " + categorias["titulo"].fillna("").astype(str) == cat]
             if not cat_row.empty:
-                cat_id = cat_row["id"].iloc[0]
+                cat_id = int(cat_row["id"].iloc[0])
                 cat_nome = cat_row["categoria"].iloc[0]
+                conteudo_inicio = int(cat_row["licao_inicial"].iloc[0])
+                conteudo_fim = int(cat_row["licao_final"].iloc[0])
+            else:
+                conteudo_inicio = 1
+                conteudo_fim = 1
+        else:
+            conteudo_inicio = 1
+            conteudo_fim = 1
 
-
-        c1,c2=st.columns(2)
-
+        c1,c2 = st.columns(2)
 
         with c1:
 
-            inicio=st.number_input(
+            inicio = st.number_input(
                 "Lição Inicial",
-                min_value=1,
-                value=int(
-                    atv.get(
-                    "licao_inicial",1)
-                ),
+                min_value=conteudo_inicio,
+                max_value=conteudo_fim,
+                value=max(conteudo_inicio, int(atv.get("licao_inicial", conteudo_inicio))),
                 key=f"inicio{i}"
             )
 
-
         with c2:
 
-            fim=st.number_input(
+            fim = st.number_input(
                 "Lição Final",
-                min_value=1,
-                value=int(
-                    atv.get(
-                    "licao_final",1)
-                ),
+                min_value=inicio,
+                max_value=conteudo_fim,
+                value=max(inicio, int(atv.get("licao_final", conteudo_inicio))),
                 key=f"fim{i}"
             )
 
@@ -311,41 +313,95 @@ if novo or st.session_state.editar:
 
     if salvar:
 
+        validacao_erro = None
+        atividades_para_salvar = []
 
-        dados={
+        for idx, atividade in enumerate(atividades_novas):
+            if not atividade["categoria_id"]:
+                validacao_erro = f"Selecione uma categoria para a atividade {idx+1}."
+                break
 
-            "nome":nome,
+            conteudo_row = categorias[categorias["id"] == atividade["categoria_id"]]
+            if conteudo_row.empty:
+                validacao_erro = f"Conteúdo não encontrado para a atividade {idx+1}."
+                break
 
-            "ordem":ordem,
+            conteudo_inicio = int(conteudo_row["licao_inicial"].iloc[0])
+            conteudo_fim = int(conteudo_row["licao_final"].iloc[0])
+            inicio_atv = int(atividade["licao_inicial"])
+            fim_atv = int(atividade["licao_final"])
 
-            "ativo":ativo,
+            if inicio_atv < conteudo_inicio:
+                validacao_erro = (
+                    f"A lição inicial da atividade {idx+1} não pode ser menor que {conteudo_inicio}."
+                )
+                break
+            if fim_atv > conteudo_fim:
+                validacao_erro = (
+                    f"A lição final da atividade {idx+1} não pode ser maior que {conteudo_fim}."
+                )
+                break
+            if inicio_atv > fim_atv:
+                validacao_erro = (
+                    f"A lição inicial da atividade {idx+1} não pode ser maior que a lição final."
+                )
+                break
 
-            "atividades":atividades_novas
+            atividades_para_salvar.append({
+                "categoria_id": int(atividade["categoria_id"]),
+                "categoria_nome": atividade["categoria_nome"],
+                "licao_inicial": inicio_atv,
+                "licao_final": fim_atv
+            })
 
-        }
-
-
-        if programa_edit:
-
-
-            supabase.table(
-                "programas_minimos"
-            ).update(
-                dados
-            ).eq(
-                "id",
-                programa_edit["id"]
-            ).execute()
-
-
+        if validacao_erro:
+            st.error(validacao_erro)
         else:
+            if programa_edit:
+                primeiro = atividades_para_salvar[0]
+                dados = {
+                    "nome": nome,
+                    "ordem": int(ordem),
+                    "ativo": bool(ativo),
+                    "atividade_inicial": str(primeiro["licao_inicial"]),
+                    "atividade_final": str(primeiro["licao_final"])
+                }
+                supabase.table(
+                    "programas_minimos"
+                ).update(
+                    dados
+                ).eq(
+                    "id",
+                    programa_edit["id"]
+                ).execute()
 
-
-            supabase.table(
-                "programas_minimos"
-            ).insert(
-                dados
-            ).execute()
+                if len(atividades_para_salvar) > 1:
+                    extras = []
+                    for atividade in atividades_para_salvar[1:]:
+                        extras.append({
+                            "nome": nome,
+                            "ordem": int(ordem),
+                            "ativo": bool(ativo),
+                            "atividade_inicial": str(atividade["licao_inicial"]),
+                            "atividade_final": str(atividade["licao_final"])
+                        })
+                    supabase.table("programas_minimos").insert(extras).execute()
+            else:
+                rows_to_insert = []
+                for atividade in atividades_para_salvar:
+                    rows_to_insert.append({
+                        "nome": nome,
+                        "ordem": int(ordem),
+                        "ativo": bool(ativo),
+                        "atividade_inicial": str(atividade["licao_inicial"]),
+                        "atividade_final": str(atividade["licao_final"])
+                    })
+                if rows_to_insert:
+                    supabase.table(
+                        "programas_minimos"
+                    ).insert(
+                        rows_to_insert
+                    ).execute()
 
 
 
@@ -353,16 +409,16 @@ if novo or st.session_state.editar:
             "Programa salvo!"
         )
 
+        # fechar formulário e atualizar listagem
+        st.session_state.show_novo_programa = False
         st.cache_data.clear()
-
         st.rerun()
 
 
 
     if cancelar:
-
         st.session_state.editar=None
-
+        st.session_state.show_novo_programa = False
         st.rerun()
 
 
@@ -380,85 +436,45 @@ st.subheader(
 
 
 
-for _,p in programas.iterrows():
+if programas.empty:
+    st.info("Nenhum programa mínimo cadastrado.")
+else:
+    grouped = programas.groupby(["nome", "ordem", "ativo"], sort=False)
+    for (nome, ordem, ativo), grupo in grouped:
+        status = "Ativo" if ativo else "Inativo"
+        label = f"{nome} — Ordem {ordem} — {status}"
 
+        with st.expander(label, expanded=False):
+            st.markdown(f"**Status:** {status}")
+            st.markdown(f"**Ordem:** {ordem}")
+            st.markdown(f"**Conteúdos:** {len(grupo)}")
+            st.divider()
 
-    with st.container(border=True):
+            for _, row in grupo.iterrows():
+                conteudo_nome = 'Conteúdo'
+                if not categorias.empty:
+                    match = categorias[
+                        (categorias["licao_inicial"].astype(int) == int(row["atividade_inicial"])) &
+                        (categorias["licao_final"].astype(int) == int(row["atividade_final"]))
+                    ]
+                    if not match.empty:
+                        conteudo_nome = match.iloc[0]["titulo"]
 
-
-        col1,col2,col3 = st.columns(
-            [1,4,1]
-        )
-
-
-        with col1:
-
-            st.markdown(
-                f"## {p.ordem}"
-            )
-
-
-        with col2:
-
-            st.subheader(
-                p.nome
-            )
-
-
-            if p.ativo:
-
-                st.success(
-                    "Ativo"
+                st.markdown(
+                    f"- {conteudo_nome} — Lição {row['atividade_inicial']} até {row['atividade_final']}"
                 )
 
-            else:
-
-                st.warning(
-                    "Inativo"
-                )
-
-
-            for a in p.atividades:
-
-                st.info(
-                    f"""
-                    {a['categoria_nome']}  
-                    Lição {a['licao_inicial']} até {a['licao_final']}
-                    """
-                )
-
-
-
-        with col3:
-
-
-            if st.button(
-                "✏️",
-                key=f"edit{p.id}"
-            ):
-
-                st.session_state.editar=p.to_dict()
-
-                st.rerun()
-
-
-
-            if st.button(
-                "🗑️",
-                key=f"del{p.id}"
-            ):
-
-
-                supabase.table(
-                    "programas_minimos"
-                ).delete().eq(
-                    "id",
-                    p.id
-                ).execute()
-
-
-                st.cache_data.clear()
-
-                st.rerun()
-
-
+                col_a, col_b = st.columns([4,1])
+                with col_b:
+                    if st.button("✏️", key=f"edit_{row['id']}"):
+                        st.session_state.editar = row.to_dict()
+                        st.rerun()
+                    if st.button("🗑️", key=f"del_{row['id']}"):
+                        supabase.table(
+                            "programas_minimos"
+                        ).delete().eq(
+                            "id",
+                            int(row["id"])
+                        ).execute()
+                        st.cache_data.clear()
+                        st.rerun()

@@ -36,7 +36,7 @@ def carregar_turmas():
         supabase
         .table("turmas")
         .select("*")
-        .eq("status", "ATIVA")
+        .eq("status", True)
         .order("nome")
         .execute()
         .data
@@ -50,7 +50,6 @@ def carregar_conteudos():
         .table("conteudos")
         .select("*")
         .order("categoria")
-        .order("fase")
         .order("titulo")
         .execute()
         .data
@@ -59,13 +58,12 @@ def carregar_conteudos():
 
 @st.cache_data(ttl=60)
 def carregar_professores():
-
     return (
         supabase
         .table("usuarios")
         .select("*")
         .eq("perfil", "PROFESSOR")
-        .eq("status", "ATIVO")
+        .eq("status", True)
         .order("nome")
         .execute()
         .data
@@ -74,13 +72,12 @@ def carregar_professores():
 
 @st.cache_data(ttl=60)
 def carregar_auxiliares():
-
     return (
         supabase
         .table("usuarios")
         .select("*")
         .eq("perfil", "AUXILIAR")
-        .eq("status", "ATIVO")
+        .eq("status", True)
         .order("nome")
         .execute()
         .data
@@ -89,13 +86,12 @@ def carregar_auxiliares():
 
 @st.cache_data(ttl=60)
 def carregar_alunos():
-
     return (
         supabase
         .table("usuarios")
         .select("*")
         .eq("perfil", "ALUNO")
-        .eq("status", "ATIVO")
+        .eq("status", True)
         .order("nome")
         .execute()
         .data

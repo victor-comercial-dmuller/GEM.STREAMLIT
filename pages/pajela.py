@@ -2,6 +2,7 @@ import streamlit as st
 from datetime import datetime
 from config import supabase
 
+
 # ==================================================
 # VERIFICAÇÃO DE AUTENTICAÇÃO
 # ==================================================
@@ -24,6 +25,7 @@ def listar_alunos():
             supabase
             .table("usuarios")
             .select("*")
+            .eq("perfil", "ALUNO")
             .order("nome")
             .execute()
         )

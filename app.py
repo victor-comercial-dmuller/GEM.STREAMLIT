@@ -21,24 +21,30 @@ elif not st.session_state.get("boas_vindas_vista", False):
 
 else:
 
-    ds_usu =usuario = st.session_state.usuario
+    usuario = st.session_state.usuario
 
-    st.sidebar.success(f"Olá, {usuario['nome']}")
-    st.sidebar.write(f"Perfil: {usuario['perfil']}")
+    with st.sidebar:
+        st.success(f"Olá, {usuario['nome']}")
+        st.write(f"Perfil: {usuario['perfil']}")
+        st.markdown("---")
+        st.subheader("FERRAMENTAS")
+        pg = st.navigation([
+            st.Page("pages/cadastros.py", title="Cadastros", icon="📋"),
+            st.Page("pages/planejamento.py", title="Planejamento", icon="📍"),
+            st.Page("pages/aulas.py", title="Aulas", icon="📚"),
+            st.Page("pages/metronomo.py", title="Metronomo", icon="🎚️"),
+            st.Page("pages/pajela.py", title="Pajela", icon="📝"),
+            st.Page("pages/p_minimo.py", title="Programa mínimo", icon="📝"),
+            st.Page("pages/avaliacoes.py", title="Avaliações", icon="📝"),
+            st.Page("pages/dashboard.py", title="Dashboard", icon="📊")
+        ])
 
-    if st.sidebar.button("Sair"):
+        st.markdown("<div style='text-align:center; margin-top: 16px;'>", unsafe_allow_html=True)
+        sair = st.button("Sair")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    if sair:
         st.session_state.clear()
         st.rerun()
-
-    pg = st.navigation([
-        st.Page("pages/cadastros.py", title="Cadastros", icon="📋"),
-        st.Page("pages/aulas.py", title="Aulas", icon="📚"),
-        st.Page("pages/metronomo.py", title="Metronomo", icon="🎚️"),
-        st.Page("pages/planejamento.py", title="Planejamento", icon="📍"),
-        st.Page("pages/pajela.py", title="Pajela", icon="📝"),
-        st.Page("pages/avaliacoes.py", title="Avaliações", icon="📝"),
-        st.Page("pages/dashboard.py", title="Dashboard", icon="📊"),
-        st.Page("pages/p_minimo.py", title="Programa mínimo", icon="📝"),
-    ])
 
     pg.run()
