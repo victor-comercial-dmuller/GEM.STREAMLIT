@@ -1,86 +1,143 @@
 import streamlit as st
-
 from database.usuarios import validar_login
 
 
 def tela_login():
 
-    # Criando espaço lateral para centralizar
-    col_esq, col_login, col_dir = st.columns([1, 2, 1])
+    # ==========================
+    # CSS
+    # ==========================
+    st.markdown("""
+    <style>
 
+    .block-container{
+        padding-top:2rem;
+        padding-bottom:2rem;
+        padding-left:2rem;
+        padding-right:2rem;
+        max-width:1400px;
+    }
 
-    with col_login:
+    [data-testid="stImage"] img{
+        width:100%;
+        height:650px;
+        object-fit:cover;
+        border-radius:12px;
+    }
 
-        st.title("🔐 Login")
+    </style>
+    """, unsafe_allow_html=True)
 
-        st.caption("Acesso para o painel de gestão de turmas e aulas.")
+    # ==========================
+    # CENTRALIZA O CARD
+    # ==========================
+    from PIL import Image
 
+    @st.cache_resource
+    def carregar_imagem():
+        return Image.open("imagens/Imagem2.jpg")
+    esp_esq, centro, esp_dir = st.columns([1, 8, 1])
 
-        login = st.text_input("Usuário")
+    with centro:
 
-        senha = st.text_input(
-            "Senha",
-            type="password"
-        )
+        with st.container(border=True):
 
+            lado_1, lado_2 = st.columns([1, 1], gap="large")
 
-        if st.button(
-            "Entrar",
-            use_container_width=True
-        ):
+            # ===================================
+            # LADO ESQUERDO
+            # ===================================
 
-            if not login or not senha:
+            with lado_1:
 
-                st.warning(
-                    "Por favor, preencha usuário e senha."
+                st.image(carregar_imagem(), use_container_width=True)
+
+            # ===================================
+            # LADO DIREITO
+            # ===================================
+
+            with lado_2:
+
+                st.markdown("<br><br><br><br>", unsafe_allow_html=True)
+
+                st.markdown(
+                    "<h1 style='text-align:center;'> MeuGem</h1>",
+                    unsafe_allow_html=True
                 )
 
-                return
-
-
-            try:
-
-                usuario = validar_login(
-                    login,
-                    senha
+                st.markdown(
+                    "<p style='text-align:center;color:gray;'>Sistema de Gestão Musical</p>",
+                    unsafe_allow_html=True
                 )
 
-            except Exception as e:
+                st.markdown("<br>", unsafe_allow_html=True)
 
-                st.error(
-                    f"Erro de conexão com o banco de dados: {e}"
+                login = st.text_input("Usuário")
+
+                senha = st.text_input(
+                    "Senha",
+                    type="password"
                 )
 
-                return
+                st.markdown("<br>", unsafe_allow_html=True)
 
+                if st.button(
+                    "Entrar",
+                    use_container_width=True
+                ):
 
-            # Fallback admin local (caso banco esteja vazio)
-            if not usuario and login == "admin" and senha == "admin123":
+                    if not login or not senha:
 
-                usuario = {
-                    "id": "00000000-0000-0000-0000-000000000000",
-                    "nome": "Administrador",
-                    "perfil": "ADMIN",
-                    "login": "admin",
-                    "status": "ATIVO"
-                }
+                        st.warning(
+                            "Por favor, preencha usuário e senha."
+                        )
 
+                        return
 
-            if usuario:
+                    try:
 
-                st.session_state.usuario = usuario
-                st.session_state.logado = True
-                st.session_state.boas_vindas_vista = False
+                        usuario = validar_login(
+                            login,
+                            senha
+                        )
 
-                st.success(
-                    "Login realizado com sucesso!"
-                )
+                    except Exception as e:
 
-                st.rerun()
+                        st.error(
+                            f"Erro de conexão com o banco de dados: {e}"
+                        )
 
+                        return
 
-            else:
+                    # Fallback admin local
+                    if (
+                        not usuario
+                        and login == "admin"
+                        and senha == "admin123"
+                    ):
 
-                st.error(
-                    "Usuário ou senha inválidos."
-                )
+                        usuario = {
+                            "id": "00000000-0000-0000-0000-000000000000",
+                            "nome": "Administrador",
+                            "perfil": "ADMIN",
+                            "login": "admin",
+                            "status": "ATIVO"
+                        }
+
+                    if usuario:
+
+                        st.session_state.usuario = usuario
+                        st.session_state.logado = True
+                        st.session_state.boas_vindas_vista = False
+
+                        st.success(
+                            "Login realizado com sucesso!"
+                        )
+
+                        st.rerun()
+
+                    else:
+
+                        st.error(
+                            "Usuário ou senha inválidos."
+                        )
