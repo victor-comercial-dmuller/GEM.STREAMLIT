@@ -8,37 +8,81 @@ def tela_boas_vindas():
     perfil = usuario.get("perfil", "—")
 
 
-    col_esq, col_centro, col_dir = st.columns([1, 2, 1])
+    st.markdown(
+        """
+        <style>
+
+        .block-container {
+            padding-top: 80px;
+        }
 
 
-    with col_centro:
+        div[data-testid="stVerticalBlockBorderWrapper"] {
 
-        st.title(
-            f"🎉 Bem-vindo(a), {nome}!"
-        )
+            border-radius: 20px;
 
-        st.divider()
+            padding: 40px;
 
+            box-shadow: 0 5px 25px rgba(0,0,0,0.08);
 
-        st.markdown(
-            f"""
-            ### 👤 Perfil
-            {perfil}
+            background-color: white;
 
-            ### 📚 Sistema
-            Você está conectado ao sistema de Gestão de Turmas e Aulas.
-            """
-        )
+        }
+
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
 
-        st.divider()
+    col1, col2, col3 = st.columns([1,2,1])
 
 
-        if st.button(
-            "🚀 Ir para o Dashboard",
-            use_container_width=True,
-            type="primary"
-        ):
+    with col2:
 
-            st.session_state.boas_vindas_vista = True
-            st.rerun()
+        with st.container(border=True):
+
+            st.markdown(
+                "<h1 style='text-align:center;'>🎵 Meu GEM</h1>",
+                unsafe_allow_html=True
+            )
+
+
+            st.markdown(
+                f"""
+                <h2 style='text-align:center;'>
+                Bem-vindo(a), {nome}!
+                </h2>
+                """,
+                unsafe_allow_html=True
+            )
+
+
+            st.write("")
+
+
+            st.markdown(
+                f"""
+                <div style="text-align:center; font-size:18px;">
+
+                👤 <b>Perfil:</b><br>
+                {perfil}
+
+
+                📚 <b>Sistema:</b><br>
+                Gestão de Ensinos Musicais
+
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+
+            if st.button(
+                "🚀 Acessar APP",
+                use_container_width=True,
+                type="primary"
+            ):
+
+                st.session_state.boas_vindas_vista = True
+                st.rerun()

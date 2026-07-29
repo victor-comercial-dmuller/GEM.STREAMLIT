@@ -21,8 +21,75 @@ if "boas_vindas_vista" not in st.session_state:
 
 
 # ==========================
-# FUNÇÃO PARA ESCONDER SIDEBAR
+# FUNÇÃO PARA ESCONDER SIDEBAR/ESTILIZAR
 # ==========================
+# ==========================
+# ESTILO MENU LATERAL
+# ==========================
+
+def estilizar_menu():
+
+    st.markdown(
+        """
+        <style>
+
+        /* Fundo da sidebar */
+        [data-testid="stSidebar"] {
+
+            background: linear-gradient(
+                180deg,
+                #0F4C81 0%,
+                #2563EB 100%
+            );
+
+        }
+
+
+        /* Texto geral da sidebar */
+        [data-testid="stSidebar"] * {
+
+            color: white;
+
+        }
+
+
+        /* Botões da sidebar */
+        [data-testid="stSidebar"] button {
+
+            background-color: rgba(255,255,255,0.12);
+
+            border-radius: 12px;
+
+            border: none;
+
+            transition: 0.3s;
+
+        }
+
+
+        /* Hover dos botões */
+        [data-testid="stSidebar"] button:hover {
+
+            background-color: rgba(255,255,255,0.25);
+
+        }
+
+
+        /* Títulos */
+        [data-testid="stSidebar"] h1,
+        [data-testid="stSidebar"] h2,
+        [data-testid="stSidebar"] h3 {
+
+            color: white;
+
+        }
+
+
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
 
 def esconder_sidebar():
     st.markdown(
@@ -69,6 +136,10 @@ else:
 
     usuario = st.session_state.usuario
 
+    # aplica o estilo do menu
+    estilizar_menu()
+
+
     # A navegação só existe depois do login
     pg = st.navigation([
         st.Page("pages/cadastros.py", title="Cadastros", icon="📋"),
@@ -83,17 +154,17 @@ else:
         st.Page("pages/ferramentas.py", title="Ferramentas", icon="🛠️"),
     ])
 
+
     with st.sidebar:
 
-        st.success(f"Olá, {usuario['nome']}")
+        
 
-        st.write(f"Perfil: {usuario['perfil']}")
+        st.warning(f"Olá, {usuario['nome']}")
 
-        st.markdown("---")
-
-        st.subheader("FERRAMENTAS")
+        st.success(f"             Perfil: {usuario['perfil']}")
 
         st.markdown("---")
+
 
         if st.button(
             "🚪 Sair",
@@ -101,5 +172,6 @@ else:
         ):
             st.session_state.clear()
             st.rerun()
+
 
     pg.run()
