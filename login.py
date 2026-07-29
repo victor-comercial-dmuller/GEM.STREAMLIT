@@ -35,7 +35,7 @@ def tela_login():
 
     @st.cache_resource
     def carregar_imagem():
-        return Image.open("imagens/Imagem2.jpg")
+        return Image.open("imagens/imagem_login.png")
     esp_esq, centro, esp_dir = st.columns([1, 8, 1])
 
     with centro:
